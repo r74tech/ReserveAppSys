@@ -1,0 +1,74 @@
+version: "3.7"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/frontend/Dockerfile
+    command: sh -c "yarn ${BUILD_CMD:-dev}"
+    expose:
+      - 5173
+    volumes:
+      - ./frontend/app:/usr/src/frontend/app
+      - node_modules:/usr/src/frontend/app/node_modules
+    env_file:
+      - ./envs/sentry.env
+    networks:
+      - frontend_network
+      - backend_network
+    restart: always
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/backend/Dockerfile
+    expose:
+      - 8000
+    volumes:
+      - ./backend:/usr/src/backend
+    env_file:
+      - ./envs/sentry.env
+    networks:
+      - cache_network
+      - backend_network
+    depends_on:
+      - redis
+    restart: always
+  
+  redis:
+    image: redis:alpine
+    expose:
+      - 6379
+    volumes:
+      - redis_data:/data
+      - ./redis/conf/redis.conf:/etc/redis.conf
+    networks:
+      - cache_network
+    restart: always
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/nginx/Dockerfile
+    ports:
+      - 8000:8000
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - frontend_network
+      - backend_network
+    restart: always  
+
+
+networks:
+  cache_network:
+    driver: bridge
+  frontend_network:
+    driver: bridge
+  backend_network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  node_modules:
